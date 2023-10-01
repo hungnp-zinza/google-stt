@@ -6,5 +6,5 @@
 
 
 ## Start the app
-- Create google service account and save credentials as `google_app_credentials.json` to the root folder
-- To start the development server run `nx serve server`. Open your browser and navigate to http://localhost:3000/. Happy coding!
+- Create a Google service account and save credentials as `google_app_credentials.json` to the root folder
+- To start the development server run `npm run dev`. Open your browser and navigate to http://localhost:3000/. Happy coding!
