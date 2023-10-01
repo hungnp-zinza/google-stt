@@ -30,7 +30,7 @@ const client = new speech.SpeechClient();
 
 const request: IStreamingRecognitionConfig = {
   config: {
-    encoding: RecognitionConfig.AudioEncoding.WEBM_OPUS,
+    encoding: RecognitionConfig.AudioEncoding.LINEAR16,
     languageCode: 'vi-VN',
     sampleRateHertz: 48000,
   },
