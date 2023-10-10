@@ -34,39 +34,58 @@ const request: IStreamingRecognitionConfig = {
     languageCode: 'vi-VN',
     sampleRateHertz: 48000,
   },
-  interimResults: false, // set to true to receive in-progress guesses
+  interimResults: true, // set to true to receive in-progress guesses
   singleUtterance: false, // set to true to close stream after a finished utterance
 };
 
-const recognizeStreams: Record<string, Duplex> = {};
+const recognizeStreams: Record<string, {stream: Duplex, text: {finalText:  string, stableText: string;}}> = {};
 
 io.on('connection', (socket) => {
   socket.on('disconnect', () => {
-    recognizeStreams[socket.id]?.end();
+    recognizeStreams[socket.id]?.stream?.end();
     delete recognizeStreams[socket.id];
   });
+  socket.on('closeStream', () => {
+    recognizeStreams[socket.id]?.stream?.end()
+    delete recognizeStreams[socket.id];
+  })
   socket.on('stream', async (data: { content: ArrayBuffer }) => {
     try {
       if (recognizeStreams[socket.id]) {
-        recognizeStreams[socket.id].write(data.content);
+        recognizeStreams[socket.id].stream.write(data.content);
       } else {
-        recognizeStreams[socket.id] = client
-          .streamingRecognize(request)
-          .on('error', (err) => {
-            console.log(err);
-            recognizeStreams[socket.id].end();
-            delete recognizeStreams[socket.id];
-          })
-          .on('data', (data) => {
-            const transcription = data.results[0].alternatives[0].transcript;
-            console.log(transcription);
-            socket.emit('transcription', transcription);
-          });
-        recognizeStreams[socket.id].write(data.content);
+        recognizeStreams[socket.id] = {
+          stream: client
+            .streamingRecognize(request)
+            .on('error', (err) => {
+              console.log(err);
+              recognizeStreams[socket.id].stream.end();
+              delete recognizeStreams[socket.id];
+            })
+            .on('data', (data) => {
+              for (const result of data.results) {
+                const transcript = result.alternatives[0].transcript
+                if (result.isFinal) {
+                  recognizeStreams[socket.id].text.finalText += transcript
+                  recognizeStreams[socket.id].text.stableText = ''
+                } else {
+                  if (result.stability > 0.5) {
+                    recognizeStreams[socket.id].text.stableText = transcript
+                  }
+                }
+              }
+              socket.emit('transcription', recognizeStreams[socket.id].text.finalText + recognizeStreams[socket.id].text.stableText);
+            }),
+          text: {
+            finalText: '',
+            stableText: ''
+          }
+        }
+        recognizeStreams[socket.id].stream.write(data.content);
       }
     } catch (e) {
       console.log(e);
-      recognizeStreams[socket.id]?.end();
+      recognizeStreams[socket.id]?.stream?.end();
       delete recognizeStreams[socket.id];
     }
   });

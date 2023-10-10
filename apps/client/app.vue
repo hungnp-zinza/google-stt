@@ -6,25 +6,26 @@
 </template>
 
 <script setup lang="ts">
-import { io } from 'socket.io-client';
+import {io, Socket} from 'socket.io-client';
 
 const record = ref<HTMLButtonElement>();
 const state = ref<RecordingState>('inactive');
 const text = ref<string>('');
 const metadata = ref<Blob>();
+const socket = ref<Socket>()
 
 onMounted(() => {
-  const socket = io(`http://localhost:3333`, {
+  socket.value = io(`http://localhost:3333`, {
     withCredentials: true,
     transports: ['websocket'],
   });
 
-  socket.on('connect', function () {
+  socket.value.on('connect', function () {
     console.log('Connected to global socket. Starting listening events...');
   });
 
-  socket.on('transcription', function (data) {
-    text.value = text.value + data;
+  socket.value.on('transcription', function (data) {
+    text.value = data;
   });
 
   if (navigator.mediaDevices) {
@@ -40,14 +41,15 @@ onMounted(() => {
         if (record.value) {
           record.value.onclick = () => {
             if (mediaRecorder.state === 'recording') {
-              text.value = '';
               mediaRecorder.stop();
               console.log(mediaRecorder.state);
               console.log('recorder stopped');
+              socket.value?.emit('closeStream')
             } else {
-              mediaRecorder.start(1000);
+              mediaRecorder.start(100);
               console.log(mediaRecorder.state);
               console.log('recorder started');
+              text.value = ''
             }
           };
         }
@@ -69,7 +71,7 @@ onMounted(() => {
         };
 
         mediaRecorder.ondataavailable = (e) => {
-          socket.emit('stream', {
+          socket.value.emit('stream', {
             content: e.data,
           });
         };
